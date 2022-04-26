@@ -105,8 +105,6 @@ def sync_from_room(key, batch, rms):
 		exit(0)
 	else:
 		send = requests.put(BASE_URL+"/rooms/"+room+"/send/m.room.message/"+str(randint(1,92392))+"?access_token="+key, data=fmtmsg(d))
-		#print(send.content)
-		#print(fmtmsg(d))
 
 
 
@@ -118,11 +116,11 @@ def get_batch(key):
 
 
 
-def sync_and_read_all(key, aliases):
+def sync_and_read_all(key, rms):
 	req = requests.get(BASE_URL+"/sync?access_token="+key)
 	p = json.loads(req.text)
-	for room in aliases:	
-		print("---------------------"+ Style.BRIGHT + Fore.GREEN + aliases[room] + Style.RESET_ALL +"---------------------------")
+	for room in rms:	
+		print("---------------------"+ Style.BRIGHT + Fore.GREEN + room + Style.RESET_ALL +"---------------------------")
 		for s in p['rooms']['join'][room]['timeline']['events']:
 			try:
 				print(Fore.RED + s['sender'] + Style.RESET_ALL, ":", s['content']['body'])
@@ -134,11 +132,8 @@ def sync_and_read_all(key, aliases):
 	
 
 def setup():
-	#conf = open("config.json", "r+")
-	#c = json.loads(conf.read())
 	print("Logging in...")
 	key = login()
-	#conf.close()
 	rew = open("config.json", "w")
 	j = get_joined_rooms(key)
 	print("Getting rooms...")
