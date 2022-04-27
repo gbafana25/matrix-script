@@ -99,12 +99,15 @@ def sync_from_room(key, batch, rms):
 				pass
 	except KeyError:
 		print("No new messages")
-	d = input("Type message or (q)uit> ")
+	d = input("Type message, (g)o back or (q)uit> ")
 	if(d == "q"):
 		print("Exiting...")
 		exit(0)
+	elif(d == "b"):
+		sync_from_room(key, batch, rms)
 	else:
 		send = requests.put(BASE_URL+"/rooms/"+room+"/send/m.room.message/"+str(randint(1,92392))+"?access_token="+key, data=fmtmsg(d))
+		sync_from_room(key, batch, rms)
 
 
 

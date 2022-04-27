@@ -4,6 +4,5 @@ This is a Python script that uses the matrix api to access messages from rooms, 
 
 
 ## TODO
-- allow sending multiple messages in a row
 
 
