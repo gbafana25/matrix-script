@@ -20,13 +20,15 @@ def login():
 	dj = json.dumps(d)
 	req = requests.post(BASE_URL+"/login", data=dj)
 	j = json.loads(req.text)
-	return j['access_token']
+	return (j['access_token'], j['device_id'])
 
 
 
 def logout(key):
 	s = requests.post("https://matrix.org/_matrix/client/v3/logout?access_token="+key);
 
+
+# takes entered text and formats it as json for http request
 def fmtmsg(text):
 	m = {
 		"body":text,
@@ -41,9 +43,13 @@ def select_room(rms):
 	for r in rms:
 		print(str(count) + ")", r)
 		count += 1
-	c = input("Which room?> ")
-	if(int(c) > count):
-		print("Room index out of range, exiting...")
+	c = input("Which room? (or (q)uit)> ")
+	try:
+		if(int(c) > count):
+			print("Room index out of range, exiting...")
+			exit(0)
+	# will exit of any non-numeric key is pressed
+	except ValueError:
 		exit(0)
 	return rms[int(c)]
 	
@@ -57,6 +63,7 @@ def get_joined_rooms(key):
 	return resp['joined_rooms']
 	
 
+# format room aliases as url-compatible, not used right now
 def urlstr(u):
 	result = ""
 	for s in u:
@@ -69,6 +76,7 @@ def urlstr(u):
 	return result
 
 
+# not used now
 def get_aliases(u):
 	aliases = {}
 	for j in range(len(u)):
@@ -77,22 +85,24 @@ def get_aliases(u):
 		p = json.loads(s.text)
 		for i in range(len(u)):
 			if(p['room_id'] == u[i]):
-				#print(u[i])
 				aliases[u[i]] = inp 
 			
 
 	return aliases
+
+
+
+def get_messages_since(b, key):
+	req = requests.get(BASE_URL+"/sync?since="+b+"&access_token="+key)
+	p = json.loads(req.text)
+	return p
 	
 
-def sync_from_room(key, batch, rms):
-	req = requests.get(BASE_URL+"/sync?since="+batch+"&access_token="+key)
-	p = json.loads(req.text)
-	#print(p)
+def sync_from_room(key, batch, rms, data):	
 	room = select_room(rms)
-	#for room in rms:	
 	print("----------------------"+ Style.BRIGHT + Fore.GREEN + room + Style.RESET_ALL + "--------------------------")
 	try:
-		for s in p['rooms']['join'][room]['timeline']['events']:
+		for s in data['rooms']['join'][room]['timeline']['events']:
 			try:
 				print(Fore.RED + s['sender'] + Style.RESET_ALL, ":", s['content']['body'])
 			except:
@@ -103,14 +113,15 @@ def sync_from_room(key, batch, rms):
 	if(d == "q"):
 		print("Exiting...")
 		exit(0)
-	elif(d == "b"):
-		sync_from_room(key, batch, rms)
+	elif(d == "g"):
+		sync_from_room(key, batch, rms, data)
 	else:
 		send = requests.put(BASE_URL+"/rooms/"+room+"/send/m.room.message/"+str(randint(1,92392))+"?access_token="+key, data=fmtmsg(d))
-		sync_from_room(key, batch, rms)
+		sync_from_room(key, batch, rms, data)
 
 
 
+# gets batch number (points to certain time)
 def get_batch(key):
 	req = requests.get(BASE_URL+"/sync?access_token="+key)
 	p = json.loads(req.text)
@@ -119,6 +130,7 @@ def get_batch(key):
 
 
 
+# dumps all room messages at once
 def sync_and_read_all(key, rms):
 	req = requests.get(BASE_URL+"/sync?access_token="+key)
 	p = json.loads(req.text)
@@ -136,16 +148,16 @@ def sync_and_read_all(key, rms):
 
 def setup():
 	print("Logging in...")
-	key = login()
+	k = login()
 	rew = open("config.json", "w")
-	j = get_joined_rooms(key)
+	j = get_joined_rooms(k[0])
 	print("Getting rooms...")
 	print("Updating aliases...")
-	#al = get_aliases(j)
-	batch = get_batch(key)
+	batch = get_batch(k[0])
 	print("Getting most recent batch number...")
 	new_data = {
-		"api_key":key,
+		"api_key":k[0],
+		"device_id":k[1],
 		"snapshot":batch,
 		"rooms":j
 	}
@@ -170,14 +182,30 @@ def refresh_rooms(key):
 	f = open("config.json", "w")
 	f.write(json.dumps(cj))
 	f.close()
+
+
+def print_help():
+	print("-------------Available Commands--------------------")
+	print()
+	print("setup - login and generate config file")
+	print("unread - get unread messages")
+	print("read_all - get all messages at once (since batch #)")
+	print("refresh_rooms - refresh list of joined rooms")
+	print("logout")
+	print()
+	print("---------------------------------------------------")
+
 		
 
 
-if sys.argv[1] == "setup":
+if len(sys.argv) != 2:
+	print_help()
+elif sys.argv[1] == "setup":
 	setup()
 elif sys.argv[1] == "unread":
 	tup = get_config()
-	sync_from_room(tup[0], tup[1], tup[2])
+	m = get_messages_since(tup[1], tup[0])
+	sync_from_room(tup[0], tup[1], tup[2], m)
 elif sys.argv[1] == "read_all":
 	tup = get_config()
 	sync_and_read_all(tup[0], tup[2])
@@ -188,6 +216,6 @@ elif sys.argv[1] == "refresh_rooms":
 	tup = get_config()
 	refresh_rooms(tup[0])
 else:
-	print("invalid command")
-
+	print_help()
+	
 
